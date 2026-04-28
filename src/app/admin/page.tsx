@@ -171,12 +171,12 @@ export default async function AdminPage({ searchParams }: { searchParams: { succ
   const approved = reservations?.filter((r) => r.status === "approved") || [];
 
   return (
-    <div className="max-w-7xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold mb-8">Panel de Administración</h1>
+    <div className="max-w-7xl mx-auto px-4 py-6 sm:py-12">
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6 sm:mb-8">Panel de Administración</h1>
 
       <AdminToastNotifier />
 
-      <div className="grid gap-8">
+      <div className="grid gap-6 sm:gap-8">
         {/* PENDING RESERVATIONS */}
         <Card>
           <CardHeader>

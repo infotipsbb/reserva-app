@@ -29,9 +29,9 @@ export default async function DashboardPage() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-12">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
-        <h1 className="text-3xl font-bold">Mis Reservas</h1>
+    <div className="max-w-6xl mx-auto px-4 py-6 sm:py-12">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-3xl font-bold">Mis Reservas</h1>
         <Link href="/reservar">
           <Button className="w-full sm:w-auto">Nueva Reserva</Button>
         </Link>
@@ -47,34 +47,34 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-3 sm:gap-4">
           {reservations.map((res) => (
-            <Card key={res.id}>
-              <CardHeader className="pb-2">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{res.courts?.name}</CardTitle>
-                  <span className={`font-semibold ${statusColors[res.status]}`}>
+            <Card key={res.id} className="overflow-hidden">
+              <CardHeader className="pb-2 px-4 sm:px-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                  <CardTitle className="text-base sm:text-lg">{res.courts?.name}</CardTitle>
+                  <span className={`text-sm font-semibold ${statusColors[res.status]}`}>
                     {statusLabels[res.status]}
                   </span>
                 </div>
               </CardHeader>
-              <CardContent>
-                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <CalendarDays className="w-4 h-4" />
+              <CardContent className="px-4 sm:px-6">
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2 sm:gap-4 text-sm text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <CalendarDays className="w-4 h-4 shrink-0" />
                     {new Date(res.date).toLocaleDateString("es-CL")}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Clock className="w-4 h-4" />
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-4 h-4 shrink-0" />
                     {res.start_time} - {res.end_time}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <MapPin className="w-4 h-4" />
+                  <div className="flex items-center gap-1.5">
+                    <MapPin className="w-4 h-4 shrink-0" />
                     Cancha {res.courts?.name}
                   </div>
                 </div>
                 {res.payment_proof_url && (
-                  <p className="mt-2 text-xs text-muted-foreground">
+                  <p className="mt-2 text-xs text-muted-foreground truncate">
                     Comprobante: {res.payment_proof_url}
                   </p>
                 )}
