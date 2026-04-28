@@ -12,11 +12,13 @@ import { Button } from "@/components/ui/button";
 
 export default function CalendarioPage() {
   const [reservations, setReservations] = useState<any[]>([]);
+  const [myReservations, setMyReservations] = useState<any[]>([]);
   const [blocks, setBlocks] = useState<any[]>([]);
   const [courts, setCourts] = useState<any[]>([]);
   const [selectedCourt, setSelectedCourt] = useState<string>("all");
   const [selectedDate, setSelectedDate] = useState<Date>();
   const [lastUpdated, setLastUpdated] = useState<string>("");
+  const [user, setUser] = useState<any>(null);
   const supabase = createClient();
 
   const fetchData = async () => {
@@ -25,20 +27,27 @@ export default function CalendarioPage() {
       .select("*")
       .eq("is_active", true);
     
-    const { data: res } = await supabase
-      .from("reservations")
-      .select("date, status, court_id, courts(name)")
-      .in("status", ["pending", "approved"]);
-    
+    // Siempre cargar bloqueos (públicos)
     const { data: blk } = await supabase
       .from("availability_blocks")
       .select("start_date, end_date, court_id, reason, courts(name)");
     
+    // Cargar TODAS las reservas (las políticas RLS permiten ver aprobadas/pendientes públicas)
+    const { data: res } = await supabase
+      .from("reservations")
+      .select("date, status, court_id, user_id, courts(name)")
+      .in("status", ["pending", "approved"]);
+    
+    // Obtener usuario actual
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    
     if (courtsData) setCourts(courtsData);
     if (res) setReservations(res);
-    if (blk) {
-      setBlocks(blk);
-      console.log("Blocks loaded:", blk);
+    if (blk) setBlocks(blk);
+    if (currentUser) {
+      setUser(currentUser);
+      // Filtrar solo mis reservas
+      setMyReservations(res?.filter((r: any) => r.user_id === currentUser.id) || []);
     }
     setLastUpdated(new Date().toLocaleTimeString("es-CL"));
   };
@@ -51,35 +60,32 @@ export default function CalendarioPage() {
   const getDayStatus = (date: Date) => {
     const dateStr = format(date, "yyyy-MM-dd");
 
-    // Filter blocks by court if selected
+    // 1. Verificar bloqueos (siempre público)
     const relevantBlocks = selectedCourt === "all" 
       ? blocks 
       : blocks.filter((b) => b.court_id === selectedCourt);
 
-    // Check blocks - a day is blocked if ANY block covers this date
     const isBlocked = relevantBlocks.some((b) => {
-      // Parse block dates (they come as ISO strings from Supabase)
       const blockStart = new Date(b.start_date);
       const blockEnd = new Date(b.end_date);
-      
-      // Create date objects for comparison (ignore time)
       const blockStartDate = new Date(blockStart.getFullYear(), blockStart.getMonth(), blockStart.getDate());
       const blockEndDate = new Date(blockEnd.getFullYear(), blockEnd.getMonth(), blockEnd.getDate());
       const checkDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-      
       return checkDate >= blockStartDate && checkDate <= blockEndDate;
     });
     if (isBlocked) return "blocked";
 
-    // Filter reservations by court if selected
-    const relevantReservations = selectedCourt === "all"
-      ? reservations
-      : reservations.filter((r) => r.court_id === selectedCourt);
+    // 2. Si el usuario está logueado, mostrar SOLO sus reservas en el calendario
+    if (user) {
+      const myRelevantReservations = selectedCourt === "all"
+        ? myReservations
+        : myReservations.filter((r) => r.court_id === selectedCourt);
 
-    // Check reservations
-    const dayRes = relevantReservations.filter((r) => r.date === dateStr);
-    if (dayRes.some((r) => r.status === "approved")) return "approved";
-    if (dayRes.some((r) => r.status === "pending")) return "pending";
+      const dayRes = myRelevantReservations.filter((r) => r.date === dateStr);
+      if (dayRes.some((r) => r.status === "approved")) return "approved";
+      if (dayRes.some((r) => r.status === "pending")) return "pending";
+    }
+
     return "available";
   };
 
@@ -95,8 +101,9 @@ export default function CalendarioPage() {
     approved: (date: Date) => getDayStatus(date) === "approved",
   };
 
-  const selectedDayReservations = selectedDate
-    ? reservations.filter((r) => {
+  // En el panel de detalles: solo mostrar MIS reservas (si estoy logueado)
+  const selectedDayMyReservations = selectedDate
+    ? myReservations.filter((r) => {
         const matchesDate = r.date === format(selectedDate, "yyyy-MM-dd");
         const matchesCourt = selectedCourt === "all" || r.court_id === selectedCourt;
         return matchesDate && matchesCourt;
@@ -107,12 +114,9 @@ export default function CalendarioPage() {
     ? blocks.filter((b) => {
         const blockStart = new Date(b.start_date);
         const blockEnd = new Date(b.end_date);
-        
-        // Compare dates ignoring time and timezone
         const blockStartDate = new Date(blockStart.getFullYear(), blockStart.getMonth(), blockStart.getDate());
         const blockEndDate = new Date(blockEnd.getFullYear(), blockEnd.getMonth(), blockEnd.getDate());
         const checkDate = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), selectedDate.getDate());
-        
         const matchesDate = checkDate >= blockStartDate && checkDate <= blockEndDate;
         const matchesCourt = selectedCourt === "all" || b.court_id === selectedCourt;
         return matchesDate && matchesCourt;
@@ -145,7 +149,8 @@ export default function CalendarioPage() {
           </Button>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
-          {blocks.length} bloqueos cargados · {reservations.length} reservas cargadas 
+          {blocks.length} bloqueos cargados
+          {user ? ` · ${myReservations.length} mis reservas` : ""}
           {lastUpdated && ` · Actualizado: ${lastUpdated}`}
         </p>
       </div>
@@ -169,16 +174,25 @@ export default function CalendarioPage() {
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded-full bg-white border" /> Disponible
               </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-yellow-300" /> Pendiente
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 rounded-full bg-green-300" /> Aprobada
-              </div>
+              {user && (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-yellow-300" /> Mi reserva pendiente
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 rounded-full bg-green-300" /> Mi reserva aprobada
+                  </div>
+                </>
+              )}
               <div className="flex items-center gap-2">
                 <div className="w-4 h-4 rounded-full bg-gray-400" /> Bloqueado
               </div>
             </div>
+            {!user && (
+              <p className="text-xs text-muted-foreground text-center mt-4">
+                <Link href="/login" className="text-primary hover:underline">Inicia sesión</Link> para ver tus reservas en el calendario.
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -193,6 +207,7 @@ export default function CalendarioPage() {
           <CardContent>
             {selectedDate ? (
               <div className="space-y-3">
+                {/* Bloqueos (públicos) */}
                 {selectedDayBlocks.length > 0 && (
                   <div className="p-3 bg-gray-100 rounded-lg border border-gray-300">
                     <p className="font-semibold text-gray-700">Bloqueos activos</p>
@@ -210,10 +225,11 @@ export default function CalendarioPage() {
                   </div>
                 )}
 
-                {selectedDayReservations.length > 0 ? (
+                {/* Mis reservas (solo si estoy logueado) */}
+                {user && selectedDayMyReservations.length > 0 ? (
                   <>
-                    <p className="font-semibold text-sm">Reservas:</p>
-                    {selectedDayReservations.map((res, idx) => (
+                    <p className="font-semibold text-sm">Mis reservas:</p>
+                    {selectedDayMyReservations.map((res, idx) => (
                       <div key={idx} className={`p-3 rounded-lg border ${
                         res.status === "approved" 
                           ? "bg-green-50 border-green-200" 
@@ -233,14 +249,20 @@ export default function CalendarioPage() {
                       </div>
                     ))}
                   </>
-                ) : selectedDayBlocks.length === 0 && (
-                  <div className="text-center py-4">
-                    <p className="text-muted-foreground mb-4">
-                      No hay reservas ni bloqueos para este día.
-                    </p>
-                  </div>
+                ) : (
+                  selectedDayBlocks.length === 0 && (
+                    <div className="text-center py-4">
+                      <p className="text-muted-foreground mb-4">
+                        {user 
+                          ? "No tienes reservas ni hay bloqueos para este día."
+                          : "No hay bloqueos para este día."
+                        }
+                      </p>
+                    </div>
+                  )
                 )}
 
+                {/* Botón reservar si no hay bloqueos */}
                 {selectedDayBlocks.length === 0 && (
                   <Link href="/reservar">
                     <Button className="w-full mt-4">Reservar esta fecha</Button>
