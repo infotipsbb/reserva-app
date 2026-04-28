@@ -11,7 +11,7 @@ export default function Home() {
       <section className="relative h-[600px] flex items-center justify-center overflow-hidden">
         <Image
           src={assets.hero}
-          alt="Club Deportivo Minvu Serviu"
+          alt="CD Minvu Serviu Biobío"
           fill
           className="object-cover"
           priority
@@ -20,11 +20,11 @@ export default function Home() {
         <div className="absolute inset-0 bg-black/50" />
         <div className="relative z-10 text-center text-white px-4 max-w-4xl mx-auto">
           <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            Reservas Club Deportivo Minvu Serviu
+            Reservas CD Minvu Serviu Biobío
           </h1>
           <p className="text-lg md:text-xl mb-8 text-white/90">
             Reserva tu cancha deportiva de forma fácil, rápida y segura. 
-            Disfruta de nuestras instalaciones de primer nivel.
+            Disfruta de nuestras instalaciones.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link href="/reservar">
@@ -115,8 +115,8 @@ export default function Home() {
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">Nuestras Instalaciones</h2>
           <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Contamos con 1 cancha de fútbol 11, 2 canchas de tenis profesionales y 1 gimnasio polideportivo
-            preparado para baby fútbol, básquetbol y voleibol.
+            Contamos con 1 cancha de fútbol, 2 canchas de tenis profesionales y 1 gimnasio polideportivo
+            preparado para baby fútbol, básquetbol, voleibol, etc.
           </p>
           <div className="grid md:grid-cols-2 gap-6">
             <div className="relative h-80 rounded-xl overflow-hidden">
@@ -153,7 +153,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="py-8 text-center text-muted-foreground border-t">
-        <p>© {new Date().getFullYear()} Club Deportivo Minvu Serviu. Todos los derechos reservados.</p>
+        <p>© {new Date().getFullYear()} CD Minvu Serviu Biobío. Todos los derechos reservados.</p>
       </footer>
     </div>
   );
