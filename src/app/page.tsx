@@ -1,10 +1,18 @@
 import Image from "next/image";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { assets, prices } from "@/config/assets";
+import { assets, courtImages, courtDescriptions } from "@/config/assets";
+import { createClient } from "@/lib/supabase/server";
 import { CalendarDays, CreditCard, ShieldCheck } from "lucide-react";
 
-export default function Home() {
+export default async function Home() {
+  const supabase = await createClient();
+  const { data: courts } = await supabase
+    .from("courts")
+    .select("*")
+    .eq("is_active", true)
+    .order("name");
+
   return (
     <div className="flex flex-col min-h-full">
       {/* Hero Section */}
@@ -23,7 +31,7 @@ export default function Home() {
             Reservas CD Minvu Serviu Biobío
           </h1>
           <p className="text-lg md:text-xl mb-8 text-white/90">
-            Reserva tu cancha deportiva de forma fácil, rápida y segura. 
+            Reserva tu cancha deportiva de forma fácil, rápida y segura.
             Disfruta de nuestras instalaciones.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -71,31 +79,39 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Courts & Prices */}
+      {/* Courts & Prices - Dinámico desde Supabase */}
       <section className="py-20 px-4">
         <div className="max-w-6xl mx-auto">
           <h2 className="text-3xl font-bold text-center mb-12">Nuestras Canchas</h2>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {prices.map((item) => (
-              <div key={item.court} className="bg-white rounded-xl overflow-hidden shadow-sm border flex flex-col">
+            {courts?.map((court) => (
+              <div key={court.id} className="bg-white rounded-xl overflow-hidden shadow-sm border flex flex-col">
                 <div className="relative h-48">
-                  <Image src={item.image} alt={item.court} fill className="object-cover" sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 25vw" />
+                  <Image
+                    src={court.image_url && court.image_url.startsWith("http") ? court.image_url : courtImages[court.name] || assets.canchaFutbol}
+                    alt={court.name}
+                    fill
+                    className="object-cover"
+                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 25vw"
+                  />
                 </div>
                 <div className="p-6 flex flex-col flex-1">
-                  <h3 className="text-xl font-semibold mb-2">{item.court}</h3>
-                  <p className="text-sm text-muted-foreground mb-4 flex-1">{item.description}</p>
+                  <h3 className="text-xl font-semibold mb-2">{court.name}</h3>
+                  <p className="text-sm text-muted-foreground mb-4 flex-1">
+                    {courtDescriptions[court.name] || court.type}
+                  </p>
                   <div className="space-y-2 mb-4">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">Socio</span>
                       <span className="text-xl font-bold text-primary">
-                        ${item.priceMember.toLocaleString("es-CL")}
+                        ${(court.price_member || court.price_per_hour).toLocaleString("es-CL")}
                         <span className="text-sm font-normal text-muted-foreground">/hr</span>
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-muted-foreground">No socio</span>
                       <span className="text-xl font-bold text-foreground">
-                        ${item.priceNonMember.toLocaleString("es-CL")}
+                        ${court.price_per_hour.toLocaleString("es-CL")}
                         <span className="text-sm font-normal text-muted-foreground">/hr</span>
                       </span>
                     </div>
