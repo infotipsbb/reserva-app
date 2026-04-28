@@ -127,8 +127,8 @@ export default function Navbar() {
           : "bg-white border-b text-foreground"
       }`}
     >
-      <Link href="/" className="text-xl font-bold">
-        Minvu Serviu
+        <Link href="/" className="text-xl font-bold">
+        CD Minvu Serviu Biobío
       </Link>
 
       {/* Desktop nav */}
