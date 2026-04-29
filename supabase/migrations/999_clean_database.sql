@@ -30,13 +30,14 @@ WHERE role = 'user';
 -- =====================================================
 
 -- PASO 5 (MANUAL): Borrar usuarios de Auth
---    Tras aplicar la migración 010, los perfiles se pueden borrar
---    limpiamente junto con sus reservas. Ahora solo quedan los
---    registros en auth.users que debes eliminar manualmente:
+--    Si la UI de Supabase Auth falla al borrar (error de BD),
+--    usa la función delete_user_complete() creada en migración 011:
 --
---    1. Ve a Supabase Dashboard > Authentication > Users
---    2. Selecciona los usuarios de prueba (los que tienen role = 'user')
---    3. Haz clic en "Delete selected users"
+--    1. Ve a Supabase Dashboard > SQL Editor
+--    2. Ejecuta: SELECT delete_user_complete('UUID_DEL_USUARIO');
+--
+--    Para encontrar el UUID, consulta:
+--    SELECT id, email FROM auth.users WHERE email = 'tu@email.com';
 --
 --    ⚠️ NO borres los usuarios que tengan rol 'admin' o 'super_admin'
 
