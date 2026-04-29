@@ -37,7 +37,7 @@ export default function Navbar() {
     getSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event: any, session: any) => {
         if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
           setUser(session?.user ?? null);
           if (session?.user) await fetchProfile(session.user.id);

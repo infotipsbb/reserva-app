@@ -73,7 +73,7 @@ export default function ReservarPage() {
 
       // Filter out reserved slots
       const reservedSlots = new Set<string>();
-      reservations?.forEach((r) => {
+      reservations?.forEach((r: any) => {
         const start = parseInt(r.start_time.split(":")[0]);
         const end = parseInt(r.end_time.split(":")[0]);
         for (let h = start; h < end; h++) {
@@ -83,7 +83,7 @@ export default function ReservarPage() {
 
       // Filter out blocked slots - check if selected date overlaps with block period
       const blockedSlots = new Set<string>();
-      blocks?.forEach((b) => {
+      blocks?.forEach((b: any) => {
         const blockStart = new Date(b.start_date);
         const blockEnd = new Date(b.end_date);
         
@@ -232,7 +232,7 @@ export default function ReservarPage() {
       const requestedStart = parseInt(startTime.split(":")[0]);
       const requestedEnd = parseInt(endTime.split(":")[0]);
 
-      const isOverlap = existingReservations?.some((res) => {
+      const isOverlap = existingReservations?.some((res: any) => {
         const resStart = parseInt(res.start_time.split(":")[0]);
         const resEnd = parseInt(res.end_time.split(":")[0]);
         return requestedStart < resEnd && requestedEnd > resStart;
