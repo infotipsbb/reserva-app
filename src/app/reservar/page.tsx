@@ -31,9 +31,13 @@ export default function ReservarPage() {
   // Verificar sesión al montar la página (protección de ruta en cliente)
   useEffect(() => {
     const checkSession = async () => {
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) {
+      // getSession() es más rápido que getUser() porque lee del almacenamiento local
+      // sin hacer petición de red. En soft navigations esto evita timeouts.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
         router.push("/login");
+      } else {
+        setUser(session.user);
       }
     };
     checkSession();
@@ -44,12 +48,7 @@ export default function ReservarPage() {
       const { data } = await supabase.from("courts").select("*, price_member").eq("is_active", true);
       if (data) setCourts(data);
     };
-    const getUser = async () => {
-      const { data } = await supabase.auth.getUser();
-      setUser(data.user);
-    };
     fetchCourts();
-    getUser();
   }, [supabase]);
 
   useEffect(() => {
@@ -184,14 +183,16 @@ export default function ReservarPage() {
     }, 15000);
 
     try {
-      console.log("[Reserva] Paso 1: Obteniendo usuario...");
-      // Obtener usuario actual de forma fresh (dentro del try para capturar cualquier error)
-      const { data: { user: currentUser } } = await supabase.auth.getUser();
-      if (!currentUser) {
+      console.log("[Reserva] Paso 1: Obteniendo sesión...");
+      // getSession() lee del almacenamiento local sin petición de red.
+      // Es más confiable que getUser() en soft navigations y modo incógnito.
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
         setError("Debes iniciar sesión para reservar. Redirigiendo al login...");
         setTimeout(() => router.push("/login"), 2000);
         return;
       }
+      const currentUser = session.user;
       console.log("[Reserva] Usuario obtenido:", currentUser.id);
 
       // FIX: Verificar/crear perfil directamente con el cliente autenticado
