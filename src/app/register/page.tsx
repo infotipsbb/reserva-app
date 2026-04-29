@@ -70,6 +70,8 @@ export default function RegisterPage() {
 
       // Login automático exitoso: actualizar perfil y redirigir
       if (signInData.user) {
+        // El trigger on_auth_user_created ya creó el perfil automáticamente.
+        // Solo actualizamos con los datos extra por si acaso.
         const { error: profileError } = await supabase
           .from("profiles")
           .update({ full_name: fullName, phone: phone })

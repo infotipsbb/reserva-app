@@ -172,140 +172,146 @@ export default function ReservarPage() {
     setLoading(true);
     setError("");
 
-    // FIX: Usar Server Action para crear perfil con privilegios de servicio (bypass RLS)
-    const profileResult = await createProfileIfNotExists(
-      currentUser.id,
-      currentUser.user_metadata?.full_name || currentUser.email || "Usuario",
-      currentUser.email || "",
-      currentUser.user_metadata?.phone || ""
-    );
+    try {
+      // FIX: Usar Server Action para crear perfil con privilegios de servicio (bypass RLS)
+      const profileResult = await createProfileIfNotExists(
+        currentUser.id,
+        currentUser.user_metadata?.full_name || currentUser.email || "Usuario",
+        currentUser.email || "",
+        currentUser.user_metadata?.phone || ""
+      );
 
-    if (!profileResult.success) {
-      setError("Error al verificar perfil: " + profileResult.error);
-      setLoading(false);
-      return;
-    }
-
-    let paymentUrl = null;
-
-    // Subir comprobante de pago si existe
-    if (paymentFile) {
-      const fileExt = paymentFile.name.split('.').pop();
-      const fileName = `${currentUser.id}_${Date.now()}.${fileExt}`;
-      const filePath = `${currentUser.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('payment-proofs')
-        .upload(filePath, paymentFile, {
-          cacheControl: '3600',
-          upsert: false,
-        });
-
-      if (uploadError) {
-        setError("Error al subir comprobante: " + uploadError.message);
+      if (!profileResult.success) {
+        setError("Error al verificar perfil: " + profileResult.error);
         setLoading(false);
         return;
       }
 
-      // Obtener URL pública
-      const { data: publicUrlData } = supabase.storage
-        .from('payment-proofs')
-        .getPublicUrl(filePath);
+      let paymentUrl = null;
 
-      paymentUrl = publicUrlData.publicUrl;
-    }
+      // Subir comprobante de pago si existe
+      if (paymentFile) {
+        const fileExt = paymentFile.name.split('.').pop();
+        const fileName = `${currentUser.id}_${Date.now()}.${fileExt}`;
+        const filePath = `${currentUser.id}/${fileName}`;
 
-    const startTime = selectedSlots[0];
-    const endHour = parseInt(selectedSlots[selectedSlots.length - 1].split(":")[0]) + 1;
-    const endTime = `${endHour.toString().padStart(2, "0")}:00`;
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
+        const { error: uploadError } = await supabase.storage
+          .from('payment-proofs')
+          .upload(filePath, paymentFile, {
+            cacheControl: '3600',
+            upsert: false,
+          });
 
-    // VALIDACIÓN FINAL: Verificar que nadie haya reservado este slot mientras el usuario seleccionaba
-    const { data: existingReservations } = await supabase
-      .from("reservations")
-      .select("id, start_time, end_time")
-      .eq("court_id", selectedCourt)
-      .eq("date", dateStr)
-      .in("status", ["pending", "approved"]);
+        if (uploadError) {
+          setError("Error al subir comprobante: " + uploadError.message);
+          setLoading(false);
+          return;
+        }
 
-    const requestedStart = parseInt(startTime.split(":")[0]);
-    const requestedEnd = parseInt(endTime.split(":")[0]);
+        // Obtener URL pública
+        const { data: publicUrlData } = supabase.storage
+          .from('payment-proofs')
+          .getPublicUrl(filePath);
 
-    const isOverlap = existingReservations?.some((res) => {
-      const resStart = parseInt(res.start_time.split(":")[0]);
-      const resEnd = parseInt(res.end_time.split(":")[0]);
-      // Hay solapamiento si el rango solicitado se intersecta con el existente
-      return requestedStart < resEnd && requestedEnd > resStart;
-    });
-
-    if (isOverlap) {
-      setError("Lo sentimos, este horario acaba de ser reservado por otra persona. Por favor selecciona otro.");
-      setLoading(false);
-      setSelectedSlots([]);
-      return;
-    }
-
-    // VALIDACIÓN FINAL: Verificar bloqueos de disponibilidad
-    const { data: blocksCheck } = await supabase
-      .from("availability_blocks")
-      .select("start_date, end_date")
-      .eq("court_id", selectedCourt);
-
-    const isBlockedFinal = blocksCheck?.some((b) => {
-      const blockStart = new Date(b.start_date);
-      const blockEnd = new Date(b.end_date);
-      const reqStart = new Date(`${dateStr}T${startTime}`);
-      const reqEnd = new Date(`${dateStr}T${endTime}`);
-      return reqStart < blockEnd && reqEnd > blockStart;
-    });
-
-    if (isBlockedFinal) {
-      setError("Este horario está bloqueado por administración. Por favor selecciona otro.");
-      setLoading(false);
-      setSelectedSlots([]);
-      return;
-    }
-
-    const { data: insertedReservation, error: insertError } = await supabase.from("reservations").insert({
-      user_id: currentUser.id,
-      court_id: selectedCourt,
-      date: dateStr,
-      start_time: startTime,
-      end_time: endTime,
-      total_price: getTotalPrice(),
-      status: "pending",
-      payment_proof_url: paymentUrl,
-    }).select().single();
-
-    if (insertError) {
-      setError(insertError.message);
-    } else {
-      // Enviar correo de notificación (async, no bloquea la UI)
-      try {
-        const { sendEmailNotification } = await import("@/lib/email-notifications");
-        await sendEmailNotification("pending", {
-          user_id: currentUser.id,
-          court_id: selectedCourt,
-          date: dateStr,
-          start_time: startTime,
-          end_time: endTime,
-          total_price: getTotalPrice(),
-        });
-      } catch (emailErr) {
-        console.error("Error enviando correo de pendiente:", emailErr);
-        // No bloquear la reserva si falla el correo
+        paymentUrl = publicUrlData.publicUrl;
       }
 
-      setLastReservation({
-        court: courts.find((c) => c.id === selectedCourt)?.name,
-        date: selectedDate,
-        startTime,
-        endTime,
-        total: getTotalPrice(),
+      const startTime = selectedSlots[0];
+      const endHour = parseInt(selectedSlots[selectedSlots.length - 1].split(":")[0]) + 1;
+      const endTime = `${endHour.toString().padStart(2, "0")}:00`;
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+
+      // VALIDACIÓN FINAL: Verificar que nadie haya reservado este slot mientras el usuario seleccionaba
+      const { data: existingReservations } = await supabase
+        .from("reservations")
+        .select("id, start_time, end_time")
+        .eq("court_id", selectedCourt)
+        .eq("date", dateStr)
+        .in("status", ["pending", "approved"]);
+
+      const requestedStart = parseInt(startTime.split(":")[0]);
+      const requestedEnd = parseInt(endTime.split(":")[0]);
+
+      const isOverlap = existingReservations?.some((res) => {
+        const resStart = parseInt(res.start_time.split(":")[0]);
+        const resEnd = parseInt(res.end_time.split(":")[0]);
+        // Hay solapamiento si el rango solicitado se intersecta con el existente
+        return requestedStart < resEnd && requestedEnd > resStart;
       });
-      setReservationSuccess(true);
+
+      if (isOverlap) {
+        setError("Lo sentimos, este horario acaba de ser reservado por otra persona. Por favor selecciona otro.");
+        setLoading(false);
+        setSelectedSlots([]);
+        return;
+      }
+
+      // VALIDACIÓN FINAL: Verificar bloqueos de disponibilidad
+      const { data: blocksCheck } = await supabase
+        .from("availability_blocks")
+        .select("start_date, end_date")
+        .eq("court_id", selectedCourt);
+
+      const isBlockedFinal = blocksCheck?.some((b) => {
+        const blockStart = new Date(b.start_date);
+        const blockEnd = new Date(b.end_date);
+        const reqStart = new Date(`${dateStr}T${startTime}`);
+        const reqEnd = new Date(`${dateStr}T${endTime}`);
+        return reqStart < blockEnd && reqEnd > blockStart;
+      });
+
+      if (isBlockedFinal) {
+        setError("Este horario está bloqueado por administración. Por favor selecciona otro.");
+        setLoading(false);
+        setSelectedSlots([]);
+        return;
+      }
+
+      const { data: insertedReservation, error: insertError } = await supabase.from("reservations").insert({
+        user_id: currentUser.id,
+        court_id: selectedCourt,
+        date: dateStr,
+        start_time: startTime,
+        end_time: endTime,
+        total_price: getTotalPrice(),
+        status: "pending",
+        payment_proof_url: paymentUrl,
+      }).select().single();
+
+      if (insertError) {
+        setError(insertError.message);
+      } else {
+        // Enviar correo de notificación (async, no bloquea la UI)
+        try {
+          const { sendEmailNotification } = await import("@/lib/email-notifications");
+          await sendEmailNotification("pending", {
+            user_id: currentUser.id,
+            court_id: selectedCourt,
+            date: dateStr,
+            start_time: startTime,
+            end_time: endTime,
+            total_price: getTotalPrice(),
+          });
+        } catch (emailErr) {
+          console.error("Error enviando correo de pendiente:", emailErr);
+          // No bloquear la reserva si falla el correo
+        }
+
+        setLastReservation({
+          court: courts.find((c) => c.id === selectedCourt)?.name,
+          date: selectedDate,
+          startTime,
+          endTime,
+          total: getTotalPrice(),
+        });
+        setReservationSuccess(true);
+      }
+    } catch (unexpectedErr: any) {
+      console.error("Error inesperado en la reserva:", unexpectedErr);
+      setError(unexpectedErr.message || "Ocurrió un error inesperado. Por favor intenta de nuevo.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleNewReservation = () => {
