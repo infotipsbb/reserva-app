@@ -29,6 +29,17 @@ export default function ReservarPage() {
   const [lastReservation, setLastReservation] = useState<any>(null);
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
 
+  // Verificar sesión al montar la página (protección de ruta en cliente)
+  useEffect(() => {
+    const checkSession = async () => {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        router.push("/login");
+      }
+    };
+    checkSession();
+  }, [supabase, router]);
+
   useEffect(() => {
     const fetchCourts = async () => {
       const { data } = await supabase.from("courts").select("*, price_member").eq("is_active", true);

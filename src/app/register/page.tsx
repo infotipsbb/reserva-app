@@ -82,6 +82,7 @@ export default function RegisterPage() {
         }
 
         router.push("/dashboard");
+        router.refresh();
         return;
       }
     }

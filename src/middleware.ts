@@ -3,8 +3,10 @@ import type { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 
 export async function middleware(request: NextRequest) {
-  let supabaseResponse = NextResponse.next({
-    request,
+  let response = NextResponse.next({
+    request: {
+      headers: request.headers,
+    },
   });
 
   const supabase = createServerClient(
@@ -16,49 +18,36 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          supabaseResponse = NextResponse.next({ request });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            supabaseResponse.cookies.set(name, value, options)
-          );
+          cookiesToSet.forEach(({ name, value }) => {
+            request.cookies.set(name, value);
+          });
+          response = NextResponse.next({
+            request,
+          });
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options);
+          });
         },
       },
     }
   );
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Refresh session if expired - required for Server Components and Auth
+  // This ensures cookies are always up-to-date during soft navigations
+  await supabase.auth.getUser();
 
-  const path = request.nextUrl.pathname;
-
-  // Protect admin routes
-  if (path.startsWith("/admin")) {
-    if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-    // Check role from profile
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user.id)
-      .single();
-
-    if (!profile || (profile.role !== "admin" && profile.role !== "super_admin")) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
-    }
-  }
-
-  // Protect dashboard
-  if (path.startsWith("/dashboard") || path.startsWith("/reservar")) {
-    if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url));
-    }
-  }
-
-  return supabaseResponse;
+  return response;
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/admin/:path*", "/reservar/:path*"],
+  matcher: [
+    /*
+     * Match all request paths except for the ones starting with:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico (favicon file)
+     * - public folder
+     */
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };
