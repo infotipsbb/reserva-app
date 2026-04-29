@@ -99,16 +99,53 @@ Después de ejecutar el SQL, verifica en **Table Editor**:
 
 ---
 
-## 3. Configurar Resend (Emails)
+## 3. Configurar Supabase Auth (Registro de Usuarios)
 
-### 3.1 Crear cuenta y verificar dominio
+> **Importante:** Si no configuras esto, los enlaces de confirmación de email apuntarán a `localhost:3000` y los usuarios no podrán acceder en producción.
+
+### 3.1 Site URL y Redirect URLs
+
+Ve a **Authentication > URL Configuration** en tu panel de Supabase:
+
+1. **Site URL**: Coloca tu dominio de producción exacto:
+   ```
+   https://reserva-app-ruby.vercel.app
+   ```
+   > Si usas un dominio personalizado, cámbialo por ese.
+
+2. **Redirect URLs**: Añade las siguientes URLs (una por línea):
+   ```
+   https://reserva-app-ruby.vercel.app/auth/callback
+   https://reserva-app-ruby.vercel.app/login
+   https://reserva-app-ruby.vercel.app/dashboard
+   ```
+   > Estas URLs permiten que el flujo de confirmación de email y recuperación de contraseña redirija correctamente a tu sitio en producción.
+
+### 3.2 Confirmación de Email (Recomendado para flujo simple)
+
+Ve a **Authentication > Providers > Email**:
+
+- **Confirm email**: `OFF` (deshabilitado)
+  > Con esto, el usuario puede registrarse y usar la aplicación inmediatamente sin tener que confirmar su correo. La app intenta iniciar sesión automáticamente tras el registro.
+
+Si prefieres mantener la confirmación de email activada (`ON`):
+- El usuario recibirá un correo con un enlace de confirmación.
+- Al hacer clic, Supabase lo redirigirá a `https://tu-dominio.com/auth/callback`.
+- La app intercambiará el código de confirmación por una sesión activa y redirigirá al dashboard.
+- Asegúrate de que el **Site URL** y **`/auth/callback`** estén correctamente configurados en el paso anterior.
+
+---
+
+## 4. Configurar Resend (Emails)
+
+### 4.1 Crear cuenta y verificar dominio
 
 1. Ve a [resend.com](https://resend.com) y crea una cuenta.
 2. Ve a **Domains** y añade tu dominio (ej: `clubminvu.cl`).
 3. Verifica el dominio siguiendo las instrucciones de DNS.
 4. Una vez verificado, copia tu **API Key** (empieza con `re_`).
 
-### 3.2 Actualizar Edge Function de Supabase
+### 4.2 Actualizar Edge Function de Supabase
 
 1. Instala Supabase CLI (si no lo tienes):
    ```bash
@@ -136,7 +173,7 @@ Después de ejecutar el SQL, verifica en **Table Editor**:
    supabase functions deploy send-email
    ```
 
-### 3.3 Actualizar remitente en el código (opcional pero recomendado)
+### 4.3 Actualizar remitente en el código (opcional pero recomendado)
 
 Abre `supabase/functions/send-email/index.ts` y cambia la línea:
 
@@ -154,9 +191,9 @@ from: "Reservas Club Deportivo <reservas@clubminvu.cl>",
 
 ---
 
-## 4. Variables de Entorno en Vercel (u otro host)
+## 5. Variables de Entorno en Vercel (u otro host)
 
-### 4.1 Subir código a GitHub
+### 5.1 Subir código a GitHub
 
 ```bash
 git init
@@ -176,7 +213,7 @@ git push -u origin main
 > git rm --cached .env.local
 > ```
 
-### 4.2 Configurar en Vercel
+### 5.2 Configurar en Vercel
 
 1. Ve a [vercel.com](https://vercel.com) e importa tu repositorio.
 2. En **Environment Variables**, añade:
@@ -193,7 +230,7 @@ git push -u origin main
 5. Output Directory: `.next` (por defecto)
 6. Deploy.
 
-### 4.3 Si usas otro host (Railway, DigitalOcean, etc.)
+### 5.3 Si usas otro host (Railway, DigitalOcean, etc.)
 
 Crea un archivo `.env` en el servidor con las mismas variables. El `output: 'standalone'` en `next.config.ts` genera una carpeta `standalone/` dentro de `.next/` con todo lo necesario para ejecutar con Node.js:
 
@@ -205,9 +242,9 @@ node server.js
 
 ---
 
-## 5. Post-Deploy: Verificaciones
+## 6. Post-Deploy: Verificaciones
 
-### 5.1 Probar flujo completo
+### 6.1 Probar flujo completo
 
 1. **Registro:** Crea una cuenta nueva.
 2. **Login:** Inicia sesión.
@@ -218,14 +255,14 @@ node server.js
 7. **Calendario:** Ve a `/calendario` y verifica que la fecha aparezca en verde.
 8. **Dashboard:** Ve a `/dashboard` y verifica que la reserva aparezca como aprobada.
 
-### 5.2 Verificar consola del navegador
+### 6.2 Verificar consola del navegador
 
 Abre DevTools (`F12`) y revisa:
 - No debe haber errores 404 en imágenes.
 - No debe haber errores de CORS.
 - No debe haber warnings de React (key props, etc.).
 
-### 5.3 Verificar Supabase
+### 6.3 Verificar Supabase
 
 Ve a Supabase > Logs > Edge Functions y verifica:
 - La función `send-email` se ejecuta sin errores.
@@ -233,9 +270,9 @@ Ve a Supabase > Logs > Edge Functions y verifica:
 
 ---
 
-## 6. Mantenimiento y Monitoreo
+## 7. Mantenimiento y Monitoreo
 
-### 6.1 Logs importantes
+### 7.1 Logs importantes
 
 | Servicio | Dónde ver logs |
 |----------|----------------|
@@ -244,13 +281,13 @@ Ve a Supabase > Logs > Edge Functions y verifica:
 | Edge Functions | Supabase > Logs > Edge Functions |
 | Emails | Resend Dashboard > Logs |
 
-### 6.2 Backups automáticos
+### 7.2 Backups automáticos
 
 En Supabase > Database > Backups:
 - Los backups diarios están incluidos en el plan gratuito.
 - Para producción real, considera el plan Pro ($25/mes) para PITR (Point-in-Time Recovery).
 
-### 6.3 Actualizaciones de seguridad
+### 7.3 Actualizaciones de seguridad
 
 Revisa mensualmente:
 
@@ -266,7 +303,7 @@ npm update
 
 ---
 
-## 7. Solución de Problemas Comunes
+## 8. Solución de Problemas Comunes
 
 ### Emails no llegan
 1. Verifica en Resend Dashboard > Logs si hay errores.
@@ -287,7 +324,7 @@ npm update
 
 ---
 
-## 8. Contacto y Soporte
+## 9. Contacto y Soporte
 
 - **Supabase Docs:** [supabase.com/docs](https://supabase.com/docs)
 - **Next.js Docs:** [nextjs.org/docs](https://nextjs.org/docs)

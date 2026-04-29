@@ -90,6 +90,22 @@ DROP POLICY IF EXISTS "Admins actualizan reservas" ON reservations;
 CREATE POLICY "Cualquiera puede ver canchas activas" 
 ON courts FOR SELECT USING (is_active = TRUE);
 
+-- Canchas: Admins pueden actualizar precios y estado
+DROP POLICY IF EXISTS "Admins actualizan canchas" ON courts;
+CREATE POLICY "Admins actualizan canchas"
+ON courts FOR UPDATE
+USING (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+);
+
+-- Canchas: Admins pueden crear nuevas canchas
+DROP POLICY IF EXISTS "Admins crean canchas" ON courts;
+CREATE POLICY "Admins crean canchas"
+ON courts FOR INSERT
+WITH CHECK (
+  EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role IN ('admin', 'super_admin'))
+);
+
 -- Reservas: Usuarios ven las suyas
 CREATE POLICY "Usuarios ven sus propias reservas" 
 ON reservations FOR SELECT USING (auth.uid() = user_id);

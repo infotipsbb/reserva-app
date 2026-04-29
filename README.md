@@ -70,3 +70,13 @@ npm run dev
   - 🟨 Amarillo: Pendiente
   - 🟩 Verde: Aprobado
   - ⬛ Gris: Bloqueado
+
+## Flujo de Registro
+
+La app intenta **iniciar sesión automáticamente** tras el registro para una mejor experiencia de usuario:
+
+- Si en Supabase tienes desactivada la **Confirmación de email**, el usuario entrará directamente al Dashboard tras registrarse.
+- Si la confirmación está activada, se muestra un mensaje amigable indicando que revise su correo para activar la cuenta.
+- El enlace de confirmación redirige a `/auth/callback`, que intercambia el código por una sesión activa y lleva al usuario al Dashboard.
+
+> **Recomendación:** Para un flujo simple, desactiva la confirmación de email en Supabase (`Authentication > Providers > Email > Confirm email: OFF`) y asegúrate de que el **Site URL** apunte a tu dominio de producción.

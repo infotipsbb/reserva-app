@@ -15,6 +15,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const router = useRouter();
   const supabase = createClient();
 
@@ -22,8 +23,10 @@ export default function RegisterPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
+    setSuccessMessage("");
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
+    // 1. Crear cuenta en Supabase Auth
+    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -31,6 +34,8 @@ export default function RegisterPage() {
           full_name: fullName,
           phone: phone,
         },
+        // URL de redirección para confirmación de email (si está activada)
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
 
@@ -40,21 +45,45 @@ export default function RegisterPage() {
       return;
     }
 
-    if (data.user) {
-      // El trigger ya creó el perfil automáticamente.
-      // Solo actualizamos con los datos extra por si acaso.
-      const { error: profileError } = await supabase
-        .from("profiles")
-        .update({ full_name: fullName, phone: phone })
-        .eq("id", data.user.id);
+    // 2. Si el usuario fue creado, intentar iniciar sesión automáticamente
+    if (signUpData.user) {
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
-      if (profileError) {
-        console.warn("Profile update warning:", profileError.message);
+      if (signInError) {
+        // Si el login falla porque el email aún no está confirmado
+        if (
+          signInError.message.toLowerCase().includes("email not confirmed") ||
+          signInError.message.toLowerCase().includes("not confirmed")
+        ) {
+          setSuccessMessage(
+            "Tu cuenta fue creada exitosamente. Revisa tu correo electrónico y haz clic en el enlace de confirmación para activar tu cuenta. Una vez confirmada, podrás iniciar sesión."
+          );
+        } else {
+          setError(signInError.message);
+        }
+        setLoading(false);
+        return;
       }
-      
-      // Redirigir al login para que inicie sesión
-      router.push("/login");
+
+      // Login automático exitoso: actualizar perfil y redirigir
+      if (signInData.user) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({ full_name: fullName, phone: phone })
+          .eq("id", signInData.user.id);
+
+        if (profileError) {
+          console.warn("Profile update warning:", profileError.message);
+        }
+
+        router.push("/dashboard");
+        return;
+      }
     }
+
     setLoading(false);
   };
 
@@ -110,7 +139,14 @@ export default function RegisterPage() {
                 required
               />
             </div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
+            {successMessage && (
+              <div className="rounded-md bg-green-50 p-3 text-sm text-green-800 border border-green-200">
+                {successMessage}
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? "Registrando..." : "Registrarse"}
             </Button>

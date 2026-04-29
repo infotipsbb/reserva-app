@@ -13,11 +13,13 @@ jest.mock("next/navigation", () => ({
 
 // Mock Supabase client
 const mockSignUp = jest.fn();
+const mockSignInWithPassword = jest.fn();
 
 jest.mock("@/lib/supabase/client", () => ({
   createClient: () => ({
     auth: {
       signUp: mockSignUp,
+      signInWithPassword: mockSignInWithPassword,
     },
     from: () => ({
       update: () => ({
@@ -67,8 +69,13 @@ describe("Register Page", () => {
     });
   });
 
-  it("redirects to login on successful registration", async () => {
+  it("redirects to dashboard on successful registration and auto-login", async () => {
     mockSignUp.mockResolvedValueOnce({
+      data: { user: { id: "123", email: "test@example.com" } },
+      error: null,
+    });
+
+    mockSignInWithPassword.mockResolvedValueOnce({
       data: { user: { id: "123", email: "test@example.com" } },
       error: null,
     });
@@ -82,7 +89,64 @@ describe("Register Page", () => {
     fireEvent.click(screen.getByRole("button", { name: /registrarse/i }));
 
     await waitFor(() => {
-      expect(mockPush).toHaveBeenCalledWith("/login");
+      expect(mockSignInWithPassword).toHaveBeenCalledWith({
+        email: "test@example.com",
+        password: "password123",
+      });
+    });
+
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith("/dashboard");
+    });
+  });
+
+  it("shows success message when email confirmation is required", async () => {
+    mockSignUp.mockResolvedValueOnce({
+      data: { user: { id: "123", email: "test@example.com" } },
+      error: null,
+    });
+
+    mockSignInWithPassword.mockResolvedValueOnce({
+      data: null,
+      error: { message: "Email not confirmed" },
+    });
+
+    render(<RegisterPage />);
+
+    await userEvent.type(screen.getByLabelText(/nombre completo/i), "Juan Pérez");
+    await userEvent.type(screen.getByLabelText(/teléfono/i), "+56912345678");
+    await userEvent.type(screen.getByLabelText(/correo electrónico/i), "test@example.com");
+    await userEvent.type(screen.getByLabelText(/contraseña/i), "password123");
+    fireEvent.click(screen.getByRole("button", { name: /registrarse/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/revisa tu correo electrónico y haz clic en el enlace de confirmación/i)
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("displays error when auto-login fails for other reasons", async () => {
+    mockSignUp.mockResolvedValueOnce({
+      data: { user: { id: "123", email: "test@example.com" } },
+      error: null,
+    });
+
+    mockSignInWithPassword.mockResolvedValueOnce({
+      data: null,
+      error: { message: "Invalid login credentials" },
+    });
+
+    render(<RegisterPage />);
+
+    await userEvent.type(screen.getByLabelText(/nombre completo/i), "Juan Pérez");
+    await userEvent.type(screen.getByLabelText(/teléfono/i), "+56912345678");
+    await userEvent.type(screen.getByLabelText(/correo electrónico/i), "test@example.com");
+    await userEvent.type(screen.getByLabelText(/contraseña/i), "password123");
+    fireEvent.click(screen.getByRole("button", { name: /registrarse/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/invalid login credentials/i)).toBeInTheDocument();
     });
   });
 });
