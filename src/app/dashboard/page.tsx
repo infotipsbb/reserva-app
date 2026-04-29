@@ -6,7 +6,14 @@ import { CalendarDays, Clock, MapPin } from "lucide-react";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+
+  let user: any = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch (err) {
+    console.error("[Dashboard] Error obteniendo usuario:", err);
+  }
 
   if (!user) redirect("/login");
 

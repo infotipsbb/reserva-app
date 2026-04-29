@@ -8,7 +8,14 @@ import AdminToastNotifier from "@/components/admin-toast";
 
 export default async function AdminPage({ searchParams }: { searchParams: { success?: string; error?: string } }) {
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+
+  let user: any = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch (err) {
+    console.error("[Admin] Error obteniendo usuario:", err);
+  }
 
   if (!user) redirect("/login");
 
