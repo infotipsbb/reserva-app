@@ -165,8 +165,20 @@ export default function ReservarPage() {
       return;
     }
 
+    // Validar tamaño del archivo (máx 5 MB)
+    if (paymentFile.size > 5 * 1024 * 1024) {
+      setError("El archivo es muy grande. Máximo 5 MB.");
+      return;
+    }
+
     setLoading(true);
     setError("");
+
+    // Timeout global de seguridad: si todo el flujo tarda más de 25s, liberar
+    const globalTimeout = setTimeout(() => {
+      setLoading(false);
+      setError("La operación tardó demasiado. Intenta recargar la página y vuelve a intentar.");
+    }, 25000);
 
     try {
       // 1. Sesión
@@ -285,6 +297,7 @@ export default function ReservarPage() {
       console.error("Error en reserva:", unexpectedErr);
       setError(unexpectedErr?.message || "Ocurrió un error. Recarga la página e intenta de nuevo.");
     } finally {
+      clearTimeout(globalTimeout);
       setLoading(false);
     }
   };
