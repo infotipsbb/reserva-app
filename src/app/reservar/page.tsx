@@ -162,6 +162,7 @@ export default function ReservarPage() {
   };
 
   const handleSubmit = async () => {
+    // Validaciones básicas inmediatas
     if (!selectedCourt || !selectedDate || selectedSlots.length === 0) {
       setError("Selecciona cancha, fecha y al menos un horario.");
       return;
@@ -172,18 +173,19 @@ export default function ReservarPage() {
       return;
     }
 
-    // Obtener usuario actual de forma fresh
-    const { data: { user: currentUser } } = await supabase.auth.getUser();
-    if (!currentUser) {
-      setError("Debes iniciar sesión para reservar. Redirigiendo al login...");
-      setTimeout(() => router.push("/login"), 2000);
-      return;
-    }
-
+    // Feedback visual inmediato para que el usuario sepa que algo está pasando
     setLoading(true);
     setError("");
 
     try {
+      // Obtener usuario actual de forma fresh (dentro del try para capturar cualquier error)
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        setError("Debes iniciar sesión para reservar. Redirigiendo al login...");
+        setTimeout(() => router.push("/login"), 2000);
+        return;
+      }
+
       // FIX: Usar Server Action para crear perfil con privilegios de servicio (bypass RLS)
       const profileResult = await createProfileIfNotExists(
         currentUser.id,
@@ -194,7 +196,6 @@ export default function ReservarPage() {
 
       if (!profileResult.success) {
         setError("Error al verificar perfil: " + profileResult.error);
-        setLoading(false);
         return;
       }
 
@@ -215,7 +216,6 @@ export default function ReservarPage() {
 
         if (uploadError) {
           setError("Error al subir comprobante: " + uploadError.message);
-          setLoading(false);
           return;
         }
 
@@ -252,7 +252,6 @@ export default function ReservarPage() {
 
       if (isOverlap) {
         setError("Lo sentimos, este horario acaba de ser reservado por otra persona. Por favor selecciona otro.");
-        setLoading(false);
         setSelectedSlots([]);
         return;
       }
@@ -273,7 +272,6 @@ export default function ReservarPage() {
 
       if (isBlockedFinal) {
         setError("Este horario está bloqueado por administración. Por favor selecciona otro.");
-        setLoading(false);
         setSelectedSlots([]);
         return;
       }
@@ -291,32 +289,33 @@ export default function ReservarPage() {
 
       if (insertError) {
         setError(insertError.message);
-      } else {
-        // Enviar correo de notificación (async, no bloquea la UI)
-        try {
-          const { sendEmailNotification } = await import("@/lib/email-notifications");
-          await sendEmailNotification("pending", {
-            user_id: currentUser.id,
-            court_id: selectedCourt,
-            date: dateStr,
-            start_time: startTime,
-            end_time: endTime,
-            total_price: getTotalPrice(),
-          });
-        } catch (emailErr) {
-          console.error("Error enviando correo de pendiente:", emailErr);
-          // No bloquear la reserva si falla el correo
-        }
-
-        setLastReservation({
-          court: courts.find((c) => c.id === selectedCourt)?.name,
-          date: selectedDate,
-          startTime,
-          endTime,
-          total: getTotalPrice(),
-        });
-        setReservationSuccess(true);
+        return;
       }
+
+      // Enviar correo de notificación (async, no bloquea la UI)
+      try {
+        const { sendEmailNotification } = await import("@/lib/email-notifications");
+        await sendEmailNotification("pending", {
+          user_id: currentUser.id,
+          court_id: selectedCourt,
+          date: dateStr,
+          start_time: startTime,
+          end_time: endTime,
+          total_price: getTotalPrice(),
+        });
+      } catch (emailErr) {
+        console.error("Error enviando correo de pendiente:", emailErr);
+        // No bloquear la reserva si falla el correo
+      }
+
+      setLastReservation({
+        court: courts.find((c) => c.id === selectedCourt)?.name,
+        date: selectedDate,
+        startTime,
+        endTime,
+        total: getTotalPrice(),
+      });
+      setReservationSuccess(true);
     } catch (unexpectedErr: any) {
       console.error("Error inesperado en la reserva:", unexpectedErr);
       setError(unexpectedErr.message || "Ocurrió un error inesperado. Por favor intenta de nuevo.");
@@ -574,6 +573,7 @@ export default function ReservarPage() {
               {error && <p className="text-sm text-destructive">{error}</p>}
 
               <Button
+                type="button"
                 className="w-full"
                 disabled={selectedSlots.length === 0 || !paymentFile || loading}
                 onClick={handleSubmit}
