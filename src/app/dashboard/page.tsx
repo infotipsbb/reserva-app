@@ -32,18 +32,18 @@ export default async function DashboardPage() {
     <div className="max-w-6xl mx-auto px-4 py-6 sm:py-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold">Mis Reservas</h1>
-        <a href="/reservar">
-          <Button className="w-full sm:w-auto">Nueva Reserva</Button>
-        </a>
+        <Button className="w-full sm:w-auto" onClick={() => window.location.href = "/reservar"}>
+          Nueva Reserva
+        </Button>
       </div>
 
       {!reservations || reservations.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground mb-4">No tienes reservas aún.</p>
-            <a href="/reservar">
-              <Button>Hacer una reserva</Button>
-            </a>
+            <Button onClick={() => window.location.href = "/reservar"}>
+              Hacer una reserva
+            </Button>
           </CardContent>
         </Card>
       ) : (

@@ -28,20 +28,20 @@ export default function ReservarPage() {
   const [lastReservation, setLastReservation] = useState<any>(null);
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
 
-  // Verificar sesión al montar la página (protección de ruta en cliente)
+  // Verificar y refrescar sesión al montar la página
   useEffect(() => {
     const checkSession = async () => {
-      // getSession() es más rápido que getUser() porque lee del almacenamiento local
-      // sin hacer petición de red. En soft navigations esto evita timeouts.
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        router.push("/login");
-      } else {
-        setUser(session.user);
+      // Primero intentamos refrescar la sesión para asegurar un token válido
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError || !refreshData.session) {
+        // Si no hay sesión válida, redirigir al login
+        window.location.href = "/login";
+        return;
       }
+      setUser(refreshData.session.user);
     };
     checkSession();
-  }, [supabase, router]);
+  }, [supabase]);
 
   useEffect(() => {
     const fetchCourts = async () => {
