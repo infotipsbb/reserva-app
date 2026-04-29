@@ -78,6 +78,25 @@ ALTER TABLE reservations ENABLE ROW LEVEL SECURITY;
 ALTER TABLE availability_blocks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 
+-- 7.1 POLITICAS RLS PARA PROFILES
+-- Usuarios pueden ver su propio perfil
+DROP POLICY IF EXISTS "Users view own profile" ON profiles;
+CREATE POLICY "Users view own profile"
+ON profiles FOR SELECT
+USING (auth.uid() = id);
+
+-- Usuarios pueden crear su propio perfil (fallback si el trigger falla)
+DROP POLICY IF EXISTS "Users insert own profile" ON profiles;
+CREATE POLICY "Users insert own profile"
+ON profiles FOR INSERT
+WITH CHECK (auth.uid() = id);
+
+-- Usuarios pueden actualizar su propio perfil
+DROP POLICY IF EXISTS "Users update own profile" ON profiles;
+CREATE POLICY "Users update own profile"
+ON profiles FOR UPDATE
+USING (auth.uid() = id);
+
 -- 8. POLÍTICAS RLS
 -- Eliminamos primero si existen para evitar errores
 DROP POLICY IF EXISTS "Cualquiera puede ver canchas activas" ON courts;

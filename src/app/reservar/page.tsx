@@ -11,7 +11,6 @@ import { DayPicker } from "react-day-picker";
 import "react-day-picker/dist/style.css";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { createProfileIfNotExists } from "@/app/actions";
 
 export default function ReservarPage() {
   const supabase = createClient();
@@ -177,7 +176,15 @@ export default function ReservarPage() {
     setLoading(true);
     setError("");
 
+    // Timeout de seguridad: si algo se cuelga, liberar el botón después de 15 segundos
+    const safetyTimeout = setTimeout(() => {
+      console.warn("[Reserva] Timeout de seguridad activado (15s). Liberando botón.");
+      setLoading(false);
+      setError("La operación tardó demasiado. Por favor intenta de nuevo.");
+    }, 15000);
+
     try {
+      console.log("[Reserva] Paso 1: Obteniendo usuario...");
       // Obtener usuario actual de forma fresh (dentro del try para capturar cualquier error)
       const { data: { user: currentUser } } = await supabase.auth.getUser();
       if (!currentUser) {
@@ -185,24 +192,42 @@ export default function ReservarPage() {
         setTimeout(() => router.push("/login"), 2000);
         return;
       }
+      console.log("[Reserva] Usuario obtenido:", currentUser.id);
 
-      // FIX: Usar Server Action para crear perfil con privilegios de servicio (bypass RLS)
-      const profileResult = await createProfileIfNotExists(
-        currentUser.id,
-        currentUser.user_metadata?.full_name || currentUser.email || "Usuario",
-        currentUser.email || "",
-        currentUser.user_metadata?.phone || ""
-      );
+      // FIX: Verificar/crear perfil directamente con el cliente autenticado
+      // (Las políticas RLS ahora permiten que un usuario gestione su propio perfil)
+      console.log("[Reserva] Verificando perfil para usuario:", currentUser.id);
+      const { data: existingProfile } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("id", currentUser.id)
+        .maybeSingle();
 
-      if (!profileResult.success) {
-        setError("Error al verificar perfil: " + profileResult.error);
-        return;
+      if (!existingProfile) {
+        console.log("[Reserva] Perfil no encontrado, creando...");
+        const { error: profileInsertError } = await supabase.from("profiles").insert({
+          id: currentUser.id,
+          full_name: currentUser.user_metadata?.full_name || currentUser.email || "Usuario",
+          email: currentUser.email || "",
+          phone: currentUser.user_metadata?.phone || "",
+          role: "user",
+        });
+
+        if (profileInsertError) {
+          console.error("[Reserva] Error creando perfil:", profileInsertError);
+          setError("Error al verificar perfil: " + profileInsertError.message);
+          return;
+        }
+        console.log("[Reserva] Perfil creado exitosamente");
+      } else {
+        console.log("[Reserva] Perfil encontrado");
       }
 
       let paymentUrl = null;
 
       // Subir comprobante de pago si existe
       if (paymentFile) {
+        console.log("[Reserva] Paso 2: Subiendo comprobante...");
         const fileExt = paymentFile.name.split('.').pop();
         const fileName = `${currentUser.id}_${Date.now()}.${fileExt}`;
         const filePath = `${currentUser.id}/${fileName}`;
@@ -215,9 +240,11 @@ export default function ReservarPage() {
           });
 
         if (uploadError) {
+          console.error("[Reserva] Error subiendo comprobante:", uploadError);
           setError("Error al subir comprobante: " + uploadError.message);
           return;
         }
+        console.log("[Reserva] Comprobante subido OK");
 
         // Obtener URL pública
         const { data: publicUrlData } = supabase.storage
@@ -231,6 +258,7 @@ export default function ReservarPage() {
       const endHour = parseInt(selectedSlots[selectedSlots.length - 1].split(":")[0]) + 1;
       const endTime = `${endHour.toString().padStart(2, "0")}:00`;
       const dateStr = format(selectedDate, "yyyy-MM-dd");
+      console.log("[Reserva] Paso 3: Validando disponibilidad...", { dateStr, startTime, endTime });
 
       // VALIDACIÓN FINAL: Verificar que nadie haya reservado este slot mientras el usuario seleccionaba
       const { data: existingReservations } = await supabase
@@ -276,6 +304,7 @@ export default function ReservarPage() {
         return;
       }
 
+      console.log("[Reserva] Paso 4: Insertando reserva...");
       const { data: insertedReservation, error: insertError } = await supabase.from("reservations").insert({
         user_id: currentUser.id,
         court_id: selectedCourt,
@@ -288,9 +317,11 @@ export default function ReservarPage() {
       }).select().single();
 
       if (insertError) {
+        console.error("[Reserva] Error insertando reserva:", insertError);
         setError(insertError.message);
         return;
       }
+      console.log("[Reserva] Reserva insertada OK:", insertedReservation);
 
       // Enviar correo de notificación (async, no bloquea la UI)
       try {
@@ -316,10 +347,12 @@ export default function ReservarPage() {
         total: getTotalPrice(),
       });
       setReservationSuccess(true);
+      console.log("[Reserva] Flujo completado exitosamente");
     } catch (unexpectedErr: any) {
-      console.error("Error inesperado en la reserva:", unexpectedErr);
+      console.error("[Reserva] Error inesperado en la reserva:", unexpectedErr);
       setError(unexpectedErr.message || "Ocurrió un error inesperado. Por favor intenta de nuevo.");
     } finally {
+      clearTimeout(safetyTimeout);
       setLoading(false);
     }
   };
