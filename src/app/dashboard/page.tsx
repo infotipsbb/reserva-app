@@ -13,26 +13,46 @@ export default function DashboardPage() {
   const [reservations, setReservations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user) {
-        window.location.href = "/login";
-        return;
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session?.user) {
+          window.location.href = "/login";
+          return;
+        }
+        setUser(session.user);
+
+        const { data } = await supabase
+          .from("reservations")
+          .select(`*, courts(name)`)
+          .eq("user_id", session.user.id)
+          .order("date", { ascending: false });
+
+        setReservations(data || []);
+      } catch (err: any) {
+        console.error("[Dashboard] Error cargando:", err);
+        setLoadError("No se pudieron cargar tus reservas. Intenta recargar la página.");
+      } finally {
+        setLoading(false);
       }
-      setUser(session.user);
-
-      const { data } = await supabase
-        .from("reservations")
-        .select(`*, courts(name)`)
-        .eq("user_id", session.user.id)
-        .order("date", { ascending: false });
-
-      setReservations(data || []);
-      setLoading(false);
     };
     init();
+
+    // Timeout de seguridad: si algo se cuelga, liberar la pantalla en 8 segundos
+    const timeout = setTimeout(() => {
+      setLoading((prev) => {
+        if (prev) {
+          setLoadError("La carga tardó demasiado. Intenta recargar la página.");
+          return false;
+        }
+        return prev;
+      });
+    }, 8000);
+
+    return () => clearTimeout(timeout);
   }, [supabase]);
 
   const statusColors: Record<string, string> = {
@@ -51,6 +71,15 @@ export default function DashboardPage() {
     return (
       <div className="max-w-6xl mx-auto px-4 py-12 text-center">
         <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-12 text-center">
+        <p className="text-destructive mb-4">{loadError}</p>
+        <Button onClick={() => window.location.reload()}>Recargar página</Button>
       </div>
     );
   }

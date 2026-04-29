@@ -25,69 +25,67 @@ export default function RegisterPage() {
     setError("");
     setSuccessMessage("");
 
-    // 1. Crear cuenta en Supabase Auth
-    const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: fullName,
-          phone: phone,
-        },
-        // URL de redirección para confirmación de email (si está activada)
-        emailRedirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-
-    if (signUpError) {
-      setError(signUpError.message);
-      setLoading(false);
-      return;
-    }
-
-    // 2. Si el usuario fue creado, intentar iniciar sesión automáticamente
-    if (signUpData.user) {
-      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+    try {
+      // 1. Crear cuenta en Supabase Auth
+      const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            phone: phone,
+          },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
       });
 
-      if (signInError) {
-        // Si el login falla porque el email aún no está confirmado
-        if (
-          signInError.message.toLowerCase().includes("email not confirmed") ||
-          signInError.message.toLowerCase().includes("not confirmed")
-        ) {
-          setSuccessMessage(
-            "Tu cuenta fue creada exitosamente. Revisa tu correo electrónico y haz clic en el enlace de confirmación para activar tu cuenta. Una vez confirmada, podrás iniciar sesión."
-          );
-        } else {
-          setError(signInError.message);
-        }
+      if (signUpError) {
+        setError(signUpError.message);
         setLoading(false);
         return;
       }
 
-      // Login automático exitoso: actualizar perfil y redirigir
-      if (signInData.user) {
-        // El trigger on_auth_user_created ya creó el perfil automáticamente.
-        // Solo actualizamos con los datos extra por si acaso.
-        const { error: profileError } = await supabase
-          .from("profiles")
-          .update({ full_name: fullName, phone: phone })
-          .eq("id", signInData.user.id);
+      // 2. Si el usuario fue creado, intentar iniciar sesión automáticamente
+      if (signUpData.user) {
+        const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
 
-        if (profileError) {
-          console.warn("Profile update warning:", profileError.message);
+        if (signInError) {
+          if (
+            signInError.message.toLowerCase().includes("email not confirmed") ||
+            signInError.message.toLowerCase().includes("not confirmed")
+          ) {
+            setSuccessMessage(
+              "Tu cuenta fue creada exitosamente. Revisa tu correo electrónico y haz clic en el enlace de confirmación para activar tu cuenta."
+            );
+          } else {
+            setError(signInError.message);
+          }
+          setLoading(false);
+          return;
         }
 
-        // Hard navigation para sincronizar cookies y estado de Supabase
-        window.location.href = "/dashboard";
-        return;
-      }
-    }
+        if (signInData.user) {
+          // Actualizar perfil con datos extra
+          await supabase
+            .from("profiles")
+            .update({ full_name: fullName, phone: phone })
+            .eq("id", signInData.user.id)
+            .catch((err: any) => console.warn("Profile update warning:", err.message));
 
-    setLoading(false);
+          // Hard navigation para sincronizar estado
+          window.location.href = "/dashboard";
+          return;
+        }
+      }
+    } catch (err: any) {
+      console.error("Error en registro:", err);
+      setError(err.message || "Ocurrió un error inesperado. Intenta de nuevo.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (

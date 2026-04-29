@@ -21,14 +21,20 @@ export default function LoginPage() {
     setLoading(true);
     setError("");
 
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
 
-    if (error) {
-      setError(error.message);
+      if (error) {
+        setError(error.message);
+        setLoading(false);
+      } else {
+        // Hard navigation para sincronizar cookies y estado de Supabase
+        window.location.href = "/dashboard";
+      }
+    } catch (err: any) {
+      console.error("Error en login:", err);
+      setError(err.message || "Ocurrió un error inesperado. Intenta de nuevo.");
       setLoading(false);
-    } else {
-      // Hard navigation para sincronizar cookies y estado de Supabase
-      window.location.href = "/dashboard";
     }
   };
 
