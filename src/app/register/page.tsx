@@ -69,11 +69,14 @@ export default function RegisterPage() {
 
         if (signInData.user) {
           // Actualizar perfil con datos extra
-          await supabase
+          const { error: profileError } = await supabase
             .from("profiles")
             .update({ full_name: fullName, phone: phone })
-            .eq("id", signInData.user.id)
-            .catch((err: any) => console.warn("Profile update warning:", err.message));
+            .eq("id", signInData.user.id);
+
+          if (profileError) {
+            console.warn("Profile update warning:", profileError.message);
+          }
 
           // Hard navigation para sincronizar estado
           window.location.href = "/dashboard";
