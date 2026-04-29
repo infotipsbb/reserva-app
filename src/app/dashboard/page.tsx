@@ -1,32 +1,44 @@
-import { createClient } from "@/lib/supabase/server";
+"use client";
+
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { CalendarDays, Clock, MapPin } from "lucide-react";
 
-export default async function DashboardPage() {
-  const supabase = await createClient();
+export default function DashboardPage() {
+  const supabase = createClient();
+  const router = useRouter();
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<any>(null);
 
-  let user: any = null;
-  try {
-    const { data } = await supabase.auth.getUser();
-    user = data.user;
-  } catch (err) {
-    console.error("[Dashboard] Error obteniendo usuario:", err);
-  }
+  useEffect(() => {
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
+        window.location.href = "/login";
+        return;
+      }
+      setUser(session.user);
 
-  if (!user) redirect("/login");
+      const { data } = await supabase
+        .from("reservations")
+        .select(`*, courts(name)`)
+        .eq("user_id", session.user.id)
+        .order("date", { ascending: false });
 
-  const { data: reservations } = await supabase
-    .from("reservations")
-    .select(`*, courts(name)`)
-    .eq("user_id", user.id)
-    .order("date", { ascending: false });
+      setReservations(data || []);
+      setLoading(false);
+    };
+    init();
+  }, [supabase]);
 
   const statusColors: Record<string, string> = {
-    pending: "text-warning",
-    approved: "text-success",
-    rejected: "text-destructive",
+    pending: "text-amber-600",
+    approved: "text-green-600",
+    rejected: "text-red-600",
   };
 
   const statusLabels: Record<string, string> = {
@@ -34,6 +46,14 @@ export default async function DashboardPage() {
     approved: "Aprobada",
     rejected: "Rechazada",
   };
+
+  if (loading) {
+    return (
+      <div className="max-w-6xl mx-auto px-4 py-12 text-center">
+        <p className="text-muted-foreground">Cargando...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-6xl mx-auto px-4 py-6 sm:py-12">
@@ -44,7 +64,7 @@ export default async function DashboardPage() {
         </Button>
       </div>
 
-      {!reservations || reservations.length === 0 ? (
+      {reservations.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground mb-4">No tienes reservas aún.</p>
