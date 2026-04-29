@@ -1,7 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CalendarDays, Clock, MapPin } from "lucide-react";
 
@@ -33,18 +32,18 @@ export default async function DashboardPage() {
     <div className="max-w-6xl mx-auto px-4 py-6 sm:py-12">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6 sm:mb-8">
         <h1 className="text-2xl sm:text-3xl font-bold">Mis Reservas</h1>
-        <Link href="/reservar">
+        <a href="/reservar">
           <Button className="w-full sm:w-auto">Nueva Reserva</Button>
-        </Link>
+        </a>
       </div>
 
       {!reservations || reservations.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
             <p className="text-muted-foreground mb-4">No tienes reservas aún.</p>
-            <Link href="/reservar">
+            <a href="/reservar">
               <Button>Hacer una reserva</Button>
-            </Link>
+            </a>
           </CardContent>
         </Card>
       ) : (

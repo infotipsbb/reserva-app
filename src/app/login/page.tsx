@@ -25,11 +25,11 @@ export default function LoginPage() {
 
     if (error) {
       setError(error.message);
+      setLoading(false);
     } else {
-      router.push("/dashboard");
-      router.refresh();
+      // Hard navigation para sincronizar cookies y estado de Supabase
+      window.location.href = "/dashboard";
     }
-    setLoading(false);
   };
 
   return (

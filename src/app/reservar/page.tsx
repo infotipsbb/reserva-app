@@ -160,7 +160,6 @@ export default function ReservarPage() {
   };
 
   const handleSubmit = async () => {
-    // Validaciones básicas inmediatas
     if (!selectedCourt || !selectedDate || selectedSlots.length === 0) {
       setError("Selecciona cancha, fecha y al menos un horario.");
       return;
@@ -171,33 +170,20 @@ export default function ReservarPage() {
       return;
     }
 
-    // Feedback visual inmediato para que el usuario sepa que algo está pasando
     setLoading(true);
     setError("");
 
-    // Timeout de seguridad: si algo se cuelga, liberar el botón después de 15 segundos
-    const safetyTimeout = setTimeout(() => {
-      console.warn("[Reserva] Timeout de seguridad activado (15s). Liberando botón.");
-      setLoading(false);
-      setError("La operación tardó demasiado. Por favor intenta de nuevo.");
-    }, 15000);
-
     try {
-      console.log("[Reserva] Paso 1: Obteniendo sesión...");
-      // getSession() lee del almacenamiento local sin petición de red.
-      // Es más confiable que getUser() en soft navigations y modo incógnito.
+      // 1. Sesión
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) {
-        setError("Debes iniciar sesión para reservar. Redirigiendo al login...");
-        setTimeout(() => router.push("/login"), 2000);
+        setError("Debes iniciar sesión para reservar.");
+        setTimeout(() => router.push("/login"), 1500);
         return;
       }
       const currentUser = session.user;
-      console.log("[Reserva] Usuario obtenido:", currentUser.id);
 
-      // FIX: Verificar/crear perfil directamente con el cliente autenticado
-      // (Las políticas RLS ahora permiten que un usuario gestione su propio perfil)
-      console.log("[Reserva] Verificando perfil para usuario:", currentUser.id);
+      // 2. Perfil (crear si no existe)
       const { data: existingProfile } = await supabase
         .from("profiles")
         .select("id")
@@ -205,63 +191,42 @@ export default function ReservarPage() {
         .maybeSingle();
 
       if (!existingProfile) {
-        console.log("[Reserva] Perfil no encontrado, creando...");
-        const { error: profileInsertError } = await supabase.from("profiles").insert({
+        await supabase.from("profiles").insert({
           id: currentUser.id,
           full_name: currentUser.user_metadata?.full_name || currentUser.email || "Usuario",
           email: currentUser.email || "",
           phone: currentUser.user_metadata?.phone || "",
           role: "user",
         });
-
-        if (profileInsertError) {
-          console.error("[Reserva] Error creando perfil:", profileInsertError);
-          setError("Error al verificar perfil: " + profileInsertError.message);
-          return;
-        }
-        console.log("[Reserva] Perfil creado exitosamente");
-      } else {
-        console.log("[Reserva] Perfil encontrado");
       }
 
+      // 3. Subir comprobante
       let paymentUrl = null;
+      const fileExt = paymentFile.name.split('.').pop();
+      const fileName = `${currentUser.id}_${Date.now()}.${fileExt}`;
+      const filePath = `${currentUser.id}/${fileName}`;
 
-      // Subir comprobante de pago si existe
-      if (paymentFile) {
-        console.log("[Reserva] Paso 2: Subiendo comprobante...");
-        const fileExt = paymentFile.name.split('.').pop();
-        const fileName = `${currentUser.id}_${Date.now()}.${fileExt}`;
-        const filePath = `${currentUser.id}/${fileName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('payment-proofs')
+        .upload(filePath, paymentFile, { cacheControl: '3600', upsert: false });
 
-        const { error: uploadError } = await supabase.storage
-          .from('payment-proofs')
-          .upload(filePath, paymentFile, {
-            cacheControl: '3600',
-            upsert: false,
-          });
-
-        if (uploadError) {
-          console.error("[Reserva] Error subiendo comprobante:", uploadError);
-          setError("Error al subir comprobante: " + uploadError.message);
-          return;
-        }
-        console.log("[Reserva] Comprobante subido OK");
-
-        // Obtener URL pública
-        const { data: publicUrlData } = supabase.storage
-          .from('payment-proofs')
-          .getPublicUrl(filePath);
-
-        paymentUrl = publicUrlData.publicUrl;
+      if (uploadError) {
+        setError("Error al subir comprobante: " + uploadError.message);
+        return;
       }
 
+      const { data: publicUrlData } = supabase.storage
+        .from('payment-proofs')
+        .getPublicUrl(filePath);
+      paymentUrl = publicUrlData.publicUrl;
+
+      // 4. Preparar datos
       const startTime = selectedSlots[0];
       const endHour = parseInt(selectedSlots[selectedSlots.length - 1].split(":")[0]) + 1;
       const endTime = `${endHour.toString().padStart(2, "0")}:00`;
       const dateStr = format(selectedDate, "yyyy-MM-dd");
-      console.log("[Reserva] Paso 3: Validando disponibilidad...", { dateStr, startTime, endTime });
 
-      // VALIDACIÓN FINAL: Verificar que nadie haya reservado este slot mientras el usuario seleccionaba
+      // 5. Validar disponibilidad
       const { data: existingReservations } = await supabase
         .from("reservations")
         .select("id, start_time, end_time")
@@ -275,38 +240,17 @@ export default function ReservarPage() {
       const isOverlap = existingReservations?.some((res) => {
         const resStart = parseInt(res.start_time.split(":")[0]);
         const resEnd = parseInt(res.end_time.split(":")[0]);
-        // Hay solapamiento si el rango solicitado se intersecta con el existente
         return requestedStart < resEnd && requestedEnd > resStart;
       });
 
       if (isOverlap) {
-        setError("Lo sentimos, este horario acaba de ser reservado por otra persona. Por favor selecciona otro.");
+        setError("Este horario acaba de ser reservado. Selecciona otro.");
         setSelectedSlots([]);
         return;
       }
 
-      // VALIDACIÓN FINAL: Verificar bloqueos de disponibilidad
-      const { data: blocksCheck } = await supabase
-        .from("availability_blocks")
-        .select("start_date, end_date")
-        .eq("court_id", selectedCourt);
-
-      const isBlockedFinal = blocksCheck?.some((b) => {
-        const blockStart = new Date(b.start_date);
-        const blockEnd = new Date(b.end_date);
-        const reqStart = new Date(`${dateStr}T${startTime}`);
-        const reqEnd = new Date(`${dateStr}T${endTime}`);
-        return reqStart < blockEnd && reqEnd > blockStart;
-      });
-
-      if (isBlockedFinal) {
-        setError("Este horario está bloqueado por administración. Por favor selecciona otro.");
-        setSelectedSlots([]);
-        return;
-      }
-
-      console.log("[Reserva] Paso 4: Insertando reserva...");
-      const { data: insertedReservation, error: insertError } = await supabase.from("reservations").insert({
+      // 6. Insertar reserva
+      const { error: insertError } = await supabase.from("reservations").insert({
         user_id: currentUser.id,
         court_id: selectedCourt,
         date: dateStr,
@@ -315,30 +259,24 @@ export default function ReservarPage() {
         total_price: getTotalPrice(),
         status: "pending",
         payment_proof_url: paymentUrl,
-      }).select().single();
+      });
 
       if (insertError) {
-        console.error("[Reserva] Error insertando reserva:", insertError);
         setError(insertError.message);
         return;
       }
-      console.log("[Reserva] Reserva insertada OK:", insertedReservation);
 
-      // Enviar correo de notificación (async, no bloquea la UI)
-      try {
-        const { sendEmailNotification } = await import("@/lib/email-notifications");
-        await sendEmailNotification("pending", {
+      // 7. Email fire-and-forget (no esperamos respuesta)
+      import("@/lib/email-notifications").then(({ sendEmailNotification }) => {
+        sendEmailNotification("pending", {
           user_id: currentUser.id,
           court_id: selectedCourt,
           date: dateStr,
           start_time: startTime,
           end_time: endTime,
           total_price: getTotalPrice(),
-        });
-      } catch (emailErr) {
-        console.error("Error enviando correo de pendiente:", emailErr);
-        // No bloquear la reserva si falla el correo
-      }
+        }).catch(() => { /* Email es opcional */ });
+      });
 
       setLastReservation({
         court: courts.find((c) => c.id === selectedCourt)?.name,
@@ -348,12 +286,10 @@ export default function ReservarPage() {
         total: getTotalPrice(),
       });
       setReservationSuccess(true);
-      console.log("[Reserva] Flujo completado exitosamente");
     } catch (unexpectedErr: any) {
-      console.error("[Reserva] Error inesperado en la reserva:", unexpectedErr);
-      setError(unexpectedErr.message || "Ocurrió un error inesperado. Por favor intenta de nuevo.");
+      console.error("Error en reserva:", unexpectedErr);
+      setError(unexpectedErr?.message || "Ocurrió un error. Recarga la página e intenta de nuevo.");
     } finally {
-      clearTimeout(safetyTimeout);
       setLoading(false);
     }
   };

@@ -81,8 +81,8 @@ export default function RegisterPage() {
           console.warn("Profile update warning:", profileError.message);
         }
 
-        router.push("/dashboard");
-        router.refresh();
+        // Hard navigation para sincronizar cookies y estado de Supabase
+        window.location.href = "/dashboard";
         return;
       }
     }
