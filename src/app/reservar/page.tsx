@@ -165,7 +165,11 @@ export default function ReservarPage() {
       return;
     }
 
-    // Validar tamaño del archivo (máx 5 MB)
+    // Validar archivo
+    if (!paymentFile.name) {
+      setError("No se pudo leer el nombre del archivo. Intenta seleccionar otro.");
+      return;
+    }
     if (paymentFile.size > 5 * 1024 * 1024) {
       setError("El archivo es muy grande. Máximo 5 MB.");
       return;
@@ -209,8 +213,9 @@ export default function ReservarPage() {
 
       // 3. Subir comprobante
       let paymentUrl = null;
-      const fileExt = paymentFile.name.split('.').pop();
-      const fileName = `${currentUser.id}_${Date.now()}.${fileExt}`;
+      const fileExt = paymentFile.name.split('.').pop() || 'jpg';
+      const safeExt = fileExt.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10);
+      const fileName = `${currentUser.id}_${Date.now()}.${safeExt || 'jpg'}`;
       const filePath = `${currentUser.id}/${fileName}`;
 
       const { error: uploadError } = await supabase.storage

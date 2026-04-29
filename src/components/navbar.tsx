@@ -18,21 +18,30 @@ export default function Navbar() {
 
   useEffect(() => {
     const fetchProfile = async (userId: string) => {
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", userId)
-        .single();
-      if (profile) setRole(profile.role);
+      try {
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("role")
+          .eq("id", userId)
+          .maybeSingle();
+        if (profile) setRole(profile.role);
+      } catch (err) {
+        console.error("[Navbar] Error fetching profile:", err);
+      }
     };
 
     const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session?.user) {
-        setUser(session.user);
-        await fetchProfile(session.user.id);
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+          await fetchProfile(session.user.id);
+        }
+      } catch (err) {
+        console.error("[Navbar] Error getting session:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
     getSession();
 
