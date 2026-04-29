@@ -28,27 +28,22 @@ export default function ReservarPage() {
   const [lastReservation, setLastReservation] = useState<any>(null);
   const [paymentFile, setPaymentFile] = useState<File | null>(null);
 
-  // Verificar y refrescar sesión al montar la página
+  // Verificar sesión y cargar canchas SECUENCIALMENTE (evita race condition de locks)
   useEffect(() => {
-    const checkSession = async () => {
-      // Primero intentamos refrescar la sesión para asegurar un token válido
-      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError || !refreshData.session) {
-        // Si no hay sesión válida, redirigir al login
+    const init = async () => {
+      // 1. Verificar sesión primero (solo lectura, no refresca)
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user) {
         window.location.href = "/login";
         return;
       }
-      setUser(refreshData.session.user);
-    };
-    checkSession();
-  }, [supabase]);
+      setUser(session.user);
 
-  useEffect(() => {
-    const fetchCourts = async () => {
+      // 2. Luego cargar canchas (una sola petición a la vez)
       const { data } = await supabase.from("courts").select("*, price_member").eq("is_active", true);
       if (data) setCourts(data);
     };
-    fetchCourts();
+    init();
   }, [supabase]);
 
   useEffect(() => {
