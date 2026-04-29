@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS courts (
 -- 4. TABLA DE RESERVAS
 CREATE TABLE IF NOT EXISTS reservations (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES profiles(id) NOT NULL,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
   court_id UUID REFERENCES courts(id) NOT NULL,
   date DATE NOT NULL,
   start_time TIME NOT NULL,
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS availability_blocks (
 -- 6. TABLA DE AUDITORÍA
 CREATE TABLE IF NOT EXISTS audit_logs (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  actor_id UUID REFERENCES profiles(id),
+  actor_id UUID REFERENCES profiles(id) ON DELETE SET NULL,
   action TEXT NOT NULL,
   target_id UUID,
   details JSONB,

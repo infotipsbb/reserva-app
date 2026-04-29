@@ -19,9 +19,9 @@ DELETE FROM availability_blocks;
 DELETE FROM reservations;
 
 -- 4. BORRAR PERFILES DE USUARIOS NORMALES (role = 'user')
+--    Al borrar el perfil, las reservas se eliminan en cascada (CASCADE).
+--    Los audit_logs conservan el registro pero con actor_id = NULL (SET NULL).
 --    Conserva administradores (admin) y super administradores (super_admin).
---    NOTA: Esto NO borra los usuarios de auth.users automáticamente.
---    Para borrarlos también del sistema de autenticación, ve al paso 5.
 DELETE FROM profiles
 WHERE role = 'user';
 
@@ -30,17 +30,15 @@ WHERE role = 'user';
 -- =====================================================
 
 -- PASO 5 (MANUAL): Borrar usuarios de Auth
---    Los registros anteriores dejan usuarios "huérfanos" en auth.users.
---    Para eliminarlos también del sistema de autenticación:
+--    Tras aplicar la migración 010, los perfiles se pueden borrar
+--    limpiamente junto con sus reservas. Ahora solo quedan los
+--    registros en auth.users que debes eliminar manualmente:
 --
 --    1. Ve a Supabase Dashboard > Authentication > Users
---    2. Filtra o busca los usuarios que ya no tienen perfil asociado
---       (o simplemente selecciona todos los que sean usuarios normales)
---    3. Haz clic en los 3 puntos (...) de cada usuario y selecciona "Delete user"
---    4. Alternativa: selecciona múltiples usuarios y usa "Delete selected users"
+--    2. Selecciona los usuarios de prueba (los que tienen role = 'user')
+--    3. Haz clic en "Delete selected users"
 --
 --    ⚠️ NO borres los usuarios que tengan rol 'admin' o 'super_admin'
---       en la tabla profiles, a menos que quieras recrearlos desde cero.
 
 -- =====================================================
 -- VERIFICACIÓN RÁPIDA (Opcional: descomenta para ejecutar)
