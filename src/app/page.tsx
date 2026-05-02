@@ -1,176 +1,97 @@
-import Image from "next/image";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { assets, courtImages, courtDescriptions } from "@/config/assets";
-import { createClient } from "@/lib/supabase/server";
-import { CalendarDays, CreditCard, ShieldCheck } from "lucide-react";
+"use client";
 
-export default async function Home() {
-  const supabase = await createClient();
-  const { data: courts } = await supabase
-    .from("courts")
-    .select("*")
-    .eq("is_active", true)
-    .order("name");
+import { useState } from "react";
+import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+
+export default function LoginPage() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  
+  const supabase = createClient();
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setError("");
+
+    try {
+      const { error: authError } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      });
+
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+      } else {
+        // Hard navigation es correcto aquí para asegurar que el middleware 
+        // de Next.js detecte la nueva cookie de sesión inmediatamente.
+        window.location.href = "/dashboard";
+      }
+    } catch (err: any) {
+      setError("Error de conexión. Intenta de nuevo.");
+      setLoading(false);
+    }
+  };
 
   return (
-    <div className="flex flex-col min-h-full">
-      {/* Hero Section */}
-      <section className="relative h-[600px] flex items-center justify-center overflow-hidden">
-        <Image
-          src={assets.hero}
-          alt="CD Minvu Serviu Biobío"
-          fill
-          className="object-cover"
-          priority
-          sizes="100vw"
-        />
-        <div className="absolute inset-0 bg-black/50" />
-        <div className="relative z-10 text-center text-white px-4 max-w-4xl mx-auto">
-          <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            Reservas CD Minvu Serviu Biobío
-          </h1>
-          <p className="text-lg md:text-xl mb-8 text-white/90">
-            Reserva tu cancha deportiva de forma fácil, rápida y segura.
-            Disfruta de nuestras instalaciones.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/reservar">
-              <Button size="lg" className="bg-primary hover:bg-primary/90 text-white px-8">
-                Reservar Ahora
-              </Button>
-            </Link>
-            <Link href="/calendario">
-              <Button size="lg" variant="outline" className="border-white text-white bg-transparent hover:bg-white/10 px-8">
-                Ver Disponibilidad
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+    <main className="flex-center">
+      <section className="auth-card">
+        <header className="auth-header">
+          <h1 className="auth-title">Iniciar Sesión</h1>
+          <p className="auth-description">Ingresa tus credenciales para acceder</p>
+        </header>
 
-      {/* Features */}
-      <section className="py-20 px-4 bg-muted">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">¿Cómo funciona?</h2>
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="flex flex-col items-center text-center p-6 bg-white rounded-xl shadow-sm">
-              <CalendarDays className="w-12 h-12 text-primary mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Elige tu horario</h3>
-              <p className="text-muted-foreground">
-                Selecciona la cancha, fecha y bloques de 1 hora que necesites.
-              </p>
-            </div>
-            <div className="flex flex-col items-center text-center p-6 bg-white rounded-xl shadow-sm">
-              <CreditCard className="w-12 h-12 text-primary mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Realiza el pago</h3>
-              <p className="text-muted-foreground">
-                Sube tu comprobante de transferencia o paga con tarjeta (próximamente).
-              </p>
-            </div>
-            <div className="flex flex-col items-center text-center p-6 bg-white rounded-xl shadow-sm">
-              <ShieldCheck className="w-12 h-12 text-primary mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Recibe confirmación</h3>
-              <p className="text-muted-foreground">
-                Te notificaremos por correo cuando tu reserva sea aprobada.
-              </p>
-            </div>
+        <form onSubmit={handleLogin}>
+          <div className="form-group">
+            <label htmlFor="email" className="form-label">Correo electrónico</label>
+            <input
+              id="email"
+              type="email"
+              className="form-input"
+              placeholder="tu@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              autoComplete="email"
+            />
           </div>
-        </div>
-      </section>
 
-      {/* Courts & Prices - Dinámico desde Supabase */}
-      <section className="py-20 px-4">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Nuestras Canchas</h2>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {courts?.map((court) => (
-              <div key={court.id} className="bg-white rounded-xl overflow-hidden shadow-sm border flex flex-col">
-                <div className="relative h-48">
-                  <Image
-                    src={court.image_url && court.image_url.startsWith("http") ? court.image_url : courtImages[court.name] || assets.canchaFutbol}
-                    alt={court.name}
-                    fill
-                    className="object-cover"
-                    sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 25vw"
-                  />
-                </div>
-                <div className="p-6 flex flex-col flex-1">
-                  <h3 className="text-xl font-semibold mb-2">{court.name}</h3>
-                  <p className="text-sm text-muted-foreground mb-4 flex-1">
-                    {courtDescriptions[court.name] || court.type}
-                  </p>
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">Socio</span>
-                      <span className="text-xl font-bold text-primary">
-                        ${(court.price_member || court.price_per_hour).toLocaleString("es-CL")}
-                        <span className="text-sm font-normal text-muted-foreground">/hr</span>
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-muted-foreground">No socio</span>
-                      <span className="text-xl font-bold text-foreground">
-                        ${court.price_per_hour.toLocaleString("es-CL")}
-                        <span className="text-sm font-normal text-muted-foreground">/hr</span>
-                      </span>
-                    </div>
-                  </div>
-                  <Link href="/reservar">
-                    <Button className="w-full">Reservar</Button>
-                  </Link>
-                </div>
-              </div>
-            ))}
+          <div className="form-group">
+            <label htmlFor="password" className="form-label">Contraseña</label>
+            <input
+              id="password"
+              type="password"
+              className="form-input"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              autoComplete="current-password"
+            />
           </div>
-        </div>
-      </section>
 
-      {/* Gallery */}
-      <section className="py-20 px-4 bg-muted">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center mb-12">Nuestras Instalaciones</h2>
-          <p className="text-center text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Contamos con 1 cancha de fútbol, 2 canchas de tenis profesionales y 1 gimnasio polideportivo
-            preparado para baby fútbol, básquetbol, voleibol, etc.
-          </p>
-          <div className="grid md:grid-cols-2 gap-6">
-            <div className="relative h-80 rounded-xl overflow-hidden">
-              <Image src={assets.canchaFutbol} alt="Cancha de fútbol" fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
-            </div>
-            <div className="relative h-80 rounded-xl overflow-hidden">
-              <Image src={assets.gimnasio} alt="Gimnasio polideportivo" fill className="object-cover" sizes="(max-width: 768px) 100vw, 50vw" />
-            </div>
-          </div>
-        </div>
-      </section>
+          {error && <p className="error-message" role="alert">{error}</p>}
 
-      {/* CTA */}
-      <section className="py-20 px-4 bg-primary text-white text-center">
-        <div className="max-w-3xl mx-auto">
-          <h2 className="text-3xl font-bold mb-4">¿Listo para jugar?</h2>
-          <p className="text-lg mb-8 text-white/90">
-            Regístrate gratis y comienza a reservar tu cancha en minutos.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/register">
-              <Button size="lg" variant="outline" className="border-white text-white bg-transparent hover:bg-white/10 px-8">
-                Crear Cuenta
-              </Button>
-            </Link>
-            <Link href="/login">
-              <Button size="lg" className="bg-white text-primary hover:bg-white/90 px-8">
-                Iniciar Sesión
-              </Button>
-            </Link>
-          </div>
-        </div>
-      </section>
+          <button 
+            type="submit" 
+            className="btn-primary" 
+            disabled={loading}
+          >
+            {loading ? "Cargando..." : "Ingresar"}
+          </button>
+        </form>
 
-      {/* Footer */}
-      <footer className="py-8 text-center text-muted-foreground border-t">
-        <p>© {new Date().getFullYear()} CD Minvu Serviu Biobío. Todos los derechos reservados.</p>
-      </footer>
-    </div>
+        <footer className="auth-footer">
+          ¿No tienes cuenta?{" "}
+          <Link href="/register" className="link">
+            Regístrate aquí
+          </Link>
+        </footer>
+      </section>
+    </main>
   );
 }
